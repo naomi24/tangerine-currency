@@ -5,18 +5,22 @@
     USD: "$", GBP: "£", EUR: "€", AUD: "$", CAD: "$", NZD: "$"
   };
 
-  // Example fixed conversion rates for demonstration
-  const conversionRates = {
-    USD: 0.65, GBP: 0.52, EUR: 0.61, AUD: 1, CAD: 0.88, NZD: 1.07
-  };
-
-  const priceSelector = ".sqs-money-native"; // Adjust if needed
+  const priceSelector = ".sqs-money-native"; // Update if needed
+  let conversionRates = {};
 
   function getUserCurrencyByGeo() {
     return fetch("https://ipapi.co/json/")
       .then(res => res.json())
       .then(data => data.currency)
       .catch(() => null);
+  }
+
+  function fetchConversionRates() {
+    return fetch(`https://api.exchangerate.host/latest?base=${baseCurrency}&symbols=${supportedCurrencies.join(",")}`)
+      .then(res => res.json())
+      .then(data => {
+        conversionRates = data.rates || {};
+      });
   }
 
   function convertAndDisplayPrices(currency) {
@@ -35,11 +39,32 @@
   }
 
   function createCurrencyDropdown(currentCurrency) {
-    const dropdown = $('<select id="currency-selector" style="margin: 1em 0;"></select>');
+    const dropdown = $('<select id="currency-selector" style="margin: 1em 0; padding: 0.5em; font-size: 1em;"></select>');
     supportedCurrencies.forEach(cur => {
       const option = $('<option></option>').val(cur).text(cur);
       if (cur === currentCurrency) option.attr("selected", "selected");
       dropdown.append(option);
     });
 
-    dropdown
+    dropdown.on("change", function () {
+      const selected = $(this).val();
+      convertAndDisplayPrices(selected);
+    });
+
+    $("body").prepend(dropdown); // You can move this elsewhere if needed
+  }
+
+  $(document).ready(function () {
+    Promise.all([fetchConversionRates(), getUserCurrencyByGeo()])
+      .then(([_, detectedCurrency]) => {
+        const isSupported = supportedCurrencies.includes(detectedCurrency);
+        const currencyToUse = isSupported ? detectedCurrency : baseCurrency;
+
+        convertAndDisplayPrices(currencyToUse);
+
+        if (!isSupported) {
+          createCurrencyDropdown(currencyToUse);
+        }
+      });
+  });
+})(jQuery);
